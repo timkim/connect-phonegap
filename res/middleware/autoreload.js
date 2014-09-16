@@ -4,35 +4,60 @@
 //
 (function() {
 
-    var url = 'http://' + '10.58.135.131:3000' + '/__api__/autoreload';
+    var url = 'http://' + '10.58.135.130:3000' + '/__api__/autoreload';
 
-    function downloadZip(){
-        //alert(typeof zip);
+    function clearAppDir(callback){
         window.requestFileSystem(
             LocalFileSystem.PERSISTENT,
             0,
             function(fileSystem) {
-                //alert('file system');
+                console.log('got file system');
+                fileSystem.root.getDirectory(fileSystem.root.toURL() +'/app' , {}, function(dirEntry){
+                    console.log('got dir');
+                    dirEntry.removeRecursively(function() {
+                        console.log('Directory removed.');
+                        callback();
+                    }, function(e){
+                        console.log('err' + e);
+                    });                    
+                });
+
+            },
+            function(e) {
+                callback(e);
+            }
+        );    
+    }
+    
+    function downloadZip(){
+        window.requestFileSystem(
+            LocalFileSystem.PERSISTENT,
+            0,
+            function(fileSystem) {
                 var fileTransfer = new FileTransfer();
                 var uri = encodeURI('http://10.58.135.130:3000' + '/__api__/zip');
-    
+                var timeStamp = Math.round(+new Date()/1000);
+                console.log('file system ' + fileSystem.root.toInternalURL() );
+                var downloadPath = fileSystem.root.toInternalURL() + 'app' + timeStamp + '.zip';
+                var dirPath =  fileSystem.root.toInternalURL() + 'app' + timeStamp;
                 fileTransfer.download(
                     uri,
-                    fileSystem.root.toURL() + 'app.zip',
+                    downloadPath,
                     function(entry) {
-                        //alert('got file');
-                        console.log("download complete: " + entry.toURL());
+                        console.log("download complete: " + downloadPath);
                         
-                        zip.unzip(fileSystem.root.toURL() + 'app.zip', fileSystem.root.toURL() +'/app', function(statusCode) {
+                        zip.unzip(downloadPath, dirPath, function(statusCode) {
+                            console.log(statusCode);
                             if (statusCode === 0) {
-                                alert('unzipped');
                                 console.log('[fileUtils] successfully extracted the update payload');
-                                //window.location.href = fileSystem.root.toURL() +'/app/index.html'; 
-                                window.location.reload();
+                                //clearAppDir(function(){
+                                    window.location.href = dirPath + 'index.html';
+                                //});
+                                
                             }
                             else {
                                 console.error('[fileUtils] error: failed to extract update payload');
-                                console.log(zipPath, dirPath);
+                                console.log(downloadPath, dirPath);
                             }
                         });
                     },
@@ -71,8 +96,6 @@
                 if (response.content.outdated) {
                     postStatus();
                     downloadZip();
-                    //window.location.reload();
-                    // for content sync - initiate file transfer then reload
                 }
             }
         }
